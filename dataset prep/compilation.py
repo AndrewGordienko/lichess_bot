@@ -170,10 +170,16 @@ for item in split_text:
 
 dataset = []
 board = chess.Board()
+boards_only = []
+HISTORY_DEPTH = 5
+for i in range(HISTORY_DEPTH):
+    boards_only.append(deepcopy(board))
+
 for move in clean_list:
     board_before = deepcopy(board)
     string_move = str(str(board.push_san(move)))
-    dataset.append([board_before, string_move])
+    dataset.append([deepcopy(board_before), string_move])
+    boards_only.append(deepcopy(board_before))
 
 split_dataset = []
 for i in range(0, len(dataset), 1):
@@ -182,6 +188,8 @@ for i in range(0, len(dataset), 1):
         split_dataset.append(deepcopy(chunk))
 
 player = 2
+board_number = HISTORY_DEPTH-1
+
 for couple in split_dataset:
     board = couple[0][0]
     if player == 2:
@@ -189,8 +197,11 @@ for couple in split_dataset:
     else:
         player = 2
 
-    probability_matrix.creating_data.fen_to_array(board.fen())
     stack = probability_matrix.stack_generation(board, player)
+    for board in boards_only[:board_number]:
+            stack = np.vstack((stack, probability_matrix.creating_data.fen_to_array(board.fen()).reshape(1, 8, 8)))
+
+    board_number += 1
     couple[0] = stack # 8x8x6 input into network
 
     if player == 2:
@@ -207,17 +218,3 @@ for couple in split_dataset:
         
     stack = probability_matrix.fill_stack(stack, move_made, value, board)
     couple[1] = stack
-
-for couple in split_dataset:
-    print("")
-    print(couple[0].shape, couple[1].shape)
-
-
-    
-
-    
-
-
-
-
-
