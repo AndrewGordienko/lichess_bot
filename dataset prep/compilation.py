@@ -171,7 +171,9 @@ for item in split_text:
 dataset = []
 board = chess.Board()
 for move in clean_list:
-    dataset.append([board, str(board.push_san(move))])
+    board_before = deepcopy(board)
+    string_move = str(str(board.push_san(move)))
+    dataset.append([board_before, string_move])
 
 split_dataset = []
 for i in range(0, len(dataset), 1):
