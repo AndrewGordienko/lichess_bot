@@ -3,6 +3,7 @@ import io
 import chess.pgn
 import numpy as np
 from copy import deepcopy
+import pickle
 
 class Creating_Data():
     def __init__(self):
@@ -161,60 +162,91 @@ probability_matrix = Probability_Matrix()
 
 text = """1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 Ne7 5. a3 Bxc3+ 6. bxc3 c5 7. Qg4 Qc7 8. Qxg7 Rg8 9. Qxh7 cxd4 10. Ne2 dxc3 11. f4 d4 12. h4 Nbc6 13. h5 Bd7 14. h6 O-O-O 15. Qd3 Rg6 16. h7 Rh8 17. Nxd4 Nxd4 18. Qxd4 Kb8 19. Rh3 Nf5 20. Qb4 Bc6 21. a4 Bxg2 22. Rxc3 Qb6 23. Qxb6 axb6 24. Ba3 Bxf1 25. O-O-O Bg2 26. Bd6+ Ka7 27. Rc7 Rxh7 28. Rc8 Rhg7 29. Bb8+ Ka6 30. Bc7 Rg8 31. Rdd8 Rxd8 32. Rxd8 Ka7 33. Bb8+ Ka6 34. Bc7 Ka7 35. Bb8+ Ka8 36. Bc7+ Ka7 1/2-1/2"""
 
-split_text = text.split(" ")
+filename = "move_dataset/clean_moves.txt"  # Replace with your file name
 
-clean_list = []
-for item in split_text:
-    if item[0].isnumeric() == False:
-        clean_list.append(item)
+paragraphs = []
+current_paragraph = ""
 
-dataset = []
-board = chess.Board()
-boards_only = []
-HISTORY_DEPTH = 5
-for i in range(HISTORY_DEPTH):
-    boards_only.append(deepcopy(board))
+with open(filename, "r") as file:
+    for line in file:
+        if line.strip():  # Check if the line is not empty
+            current_paragraph += line.strip() + " "
+        else:
+            paragraphs.append(current_paragraph.strip())
+            current_paragraph = ""
 
-for move in clean_list:
-    board_before = deepcopy(board)
-    string_move = str(str(board.push_san(move)))
-    dataset.append([deepcopy(board_before), string_move])
-    boards_only.append(deepcopy(board_before))
+    # Append the last paragraph
+    if current_paragraph:
+        paragraphs.append(current_paragraph.strip())
 
-split_dataset = []
-for i in range(0, len(dataset), 1):
-    chunk = dataset[i:i + 2]
-    if len(chunk) == 2:
-        split_dataset.append(deepcopy(chunk))
+print("all paragraphs done")
+print(len(paragraphs))
+final_dataset = []
+for i, text in enumerate(paragraphs):
+    if i == 1000:
+        break
 
-player = 2
-board_number = HISTORY_DEPTH-1
+    print(i)
+    split_text = text.split(" ")
 
-for couple in split_dataset:
-    board = couple[0][0]
-    if player == 2:
-        player = 1
-    else:
-        player = 2
+    clean_list = []
+    for item in split_text:
+        if item[0].isnumeric() == False:
+            clean_list.append(item)
 
-    stack = probability_matrix.stack_generation(board, player)
-    for board in boards_only[:board_number]:
-            stack = np.vstack((stack, probability_matrix.creating_data.fen_to_array(board.fen()).reshape(1, 8, 8)))
+    dataset = []
+    board = chess.Board()
+    boards_only = []
+    HISTORY_DEPTH = 5
+    for i in range(HISTORY_DEPTH):
+        boards_only.append(deepcopy(board))
 
-    board_number += 1
-    couple[0] = stack # 8x8x6 input into network
+    for move in clean_list:
+        board_before = deepcopy(board)
+        string_move = str(str(board.push_san(move)))
+        dataset.append([deepcopy(board_before), string_move])
+        boards_only.append(deepcopy(board_before))
 
-    if player == 2:
-        player = 1
-    else:
-        player = 2
-    
+    split_dataset = []
+    for i in range(0, len(dataset), 1):
+        chunk = dataset[i:i + 2]
+        if len(chunk) == 2:
+            split_dataset.append(deepcopy(chunk))
 
-    board, move_made = couple[1][0], couple[1][1]
-    stack = np.zeros((8, 8, 76))
-    value = 1
-    if player == 2:
-        value = -1
+    player = 2
+    board_number = HISTORY_DEPTH-1
+
+    for couple in split_dataset:
+        board = couple[0][0]
+        if player == 2:
+            player = 1
+        else:
+            player = 2
+
+        stack = probability_matrix.stack_generation(board, player)
+        for board in boards_only[board_number-5:board_number]:
+                stack = np.vstack((stack, probability_matrix.creating_data.fen_to_array(board.fen()).reshape(1, 8, 8)))
+
+        board_number += 1
+        couple[0] = stack # 8x8x6 input into network
+
+        if player == 2:
+            player = 1
+        else:
+            player = 2
         
-    stack = probability_matrix.fill_stack(stack, move_made, value, board)
-    couple[1] = stack
+
+        board, move_made = couple[1][0], couple[1][1]
+        stack = np.zeros((8, 8, 76))
+        value = 1
+        if player == 2:
+            value = -1
+            
+        stack = probability_matrix.fill_stack(stack, move_made, value, board)
+        couple[1] = stack
+        final_dataset.append(couple)
+
+with open('listfile.pkl', 'wb') as f:
+    pickle.dump(final_dataset, f)
+print(len(final_dataset))
+print("List of arrays saved to a pickle file.")
